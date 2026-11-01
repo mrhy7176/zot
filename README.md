@@ -329,6 +329,8 @@ Print-mode stats contain `provider`, `model`, `prompt_tokens`, `reasoning_tokens
 - `edit`: one or more exact-match replacements in an existing file.
 - `bash`: run a command in the session cwd with merged stdout/stderr and a timeout. On Unix, zot uses `/bin/bash -c` when available, then `bash -c` from `PATH`, and falls back to POSIX `/bin/sh -c` when Bash is unavailable. On Windows, it uses `cmd /C`. macOS ships Bash 3.2 by default, so newer Bash features may be unavailable.
 
+In the interactive UI on Unix, a leading `cd <cwd> &&` in a Bash command is shown in muted colors when its literal path exactly matches the call's working directory. Quoted paths are supported. Expansions and ambiguous shell syntax are left unchanged. This only changes presentation, not execution or saved tool output. Calls restored from a saved session keep their original styling because their call-time working directory is not recorded.
+
 When the sandbox is on (see `/jail`), filesystem tools refuse paths outside the session cwd, except that `read` and `glob` can access loaded extension directories. `bash` applies best-effort command checks. Jail mode is an accident-prevention guardrail, not a security boundary.
 
 ### Codemode

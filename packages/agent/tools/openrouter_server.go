@@ -85,16 +85,17 @@ func OpenRouterServerTools() []core.Tool {
 		&OpenRouterServerTool{
 			name:        "openrouter:advisor",
 			description: "Consult a stronger model for guidance mid-generation. Executed by OpenRouter.",
-			schema:      json.RawMessage(`{"model":"openai/gpt-4.1-mini"}`),
+			schema:      json.RawMessage(`{"model":"~anthropic/claude-opus-latest"}`),
 		},
 		&OpenRouterServerTool{
 			name:        "openrouter:subagent",
 			description: "Delegate a self-contained task to a smaller worker model. Executed by OpenRouter.",
-			schema:      json.RawMessage(`{"model":"openai/gpt-4.1-mini"}`),
+			schema:      json.RawMessage(`{"model":"~deepseek/deepseek-flash-latest"}`),
 		},
 		&OpenRouterServerTool{
 			name:        "openrouter:fusion",
 			description: "Run a panel of models and an analyst for multi-model analysis. Executed by OpenRouter.",
+			schema:      json.RawMessage(`{"analysis_models":["~anthropic/claude-haiku-latest","~deepseek/deepseek-flash-latest","~openai/gpt-luna-latest"]}`),
 		},
 		&OpenRouterServerTool{
 			name:        "openrouter:image_generation",

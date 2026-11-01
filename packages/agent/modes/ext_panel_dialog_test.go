@@ -7,6 +7,58 @@ import (
 	"github.com/patriceckhart/zot/packages/tui"
 )
 
+func TestExtPanelPlainBodyUsesForeground(t *testing.T) {
+	for name, th := range map[string]tui.Theme{"dark": tui.Dark, "light": tui.Light} {
+		t.Run(name, func(t *testing.T) {
+			const text = "alpha bravo charlie delta echo"
+			for _, width := range []int{12, 80} {
+				rows := renderExtPanelLine(th, text, width)
+				plainRows := tui.WrapANSILine(text, width)
+				if len(rows) != len(plainRows) {
+					t.Fatalf("got %d rows, want %d", len(rows), len(plainRows))
+				}
+				assertRowsFitWidth(t, rows, width)
+				for i, row := range rows {
+					if want := th.FG256(th.FG, plainRows[i]); row != want {
+						t.Errorf("width %d row %d = %q, want foreground styling %q", width, i, row, want)
+					}
+				}
+				for _, row := range renderExtPanelFooter(th, text, width) {
+					if want := th.FG256(th.Muted, stripANSIBytes(row)); row != want {
+						t.Errorf("footer lost muted styling: %q", row)
+					}
+				}
+			}
+		})
+	}
+}
+
+func TestExtPanelCheckmarksRestoreBodyForeground(t *testing.T) {
+	for name, th := range map[string]tui.Theme{"dark": tui.Dark, "light": tui.Light} {
+		t.Run(name, func(t *testing.T) {
+			const text = "before ✓ after ✓ done"
+			for _, width := range []int{10, 80} {
+				rows := renderExtPanelLine(th, text, width)
+				plainRows := tui.WrapANSILine(text, width)
+				if len(rows) != len(plainRows) {
+					t.Fatalf("got %d rows, want %d", len(rows), len(plainRows))
+				}
+				assertRowsFitWidth(t, rows, width)
+				for i, row := range rows {
+					parts := strings.Split(plainRows[i], "✓")
+					for i := range parts {
+						parts[i] = th.FG256(th.FG, parts[i])
+					}
+					want := strings.Join(parts, th.FG256(th.Tool, "✓"))
+					if row != want {
+						t.Errorf("body foreground not restored around checkmarks: got %q, want %q", row, want)
+					}
+				}
+			}
+		})
+	}
+}
+
 // TestExtPanelDialogWrapsLongLines is a regression test for the extension
 // panel text-wrapping bug. Extensions never receive the terminal width, so
 // the host owns wrapping. Before this fix each panel line was emitted whole
@@ -42,10 +94,10 @@ func TestExtPanelDialogWrapsSelectedLine(t *testing.T) {
 	d := newExtPanelDialog()
 	d.Open("demo", "main", "Demo", []string{"▸ alpha bravo charlie delta echo"}, "")
 
-	rows := d.Render(tui.Theme{}, width)
+	rows := d.Render(tui.Dark, width)
 	assertRowsFitWidth(t, rows, width)
 
-	base := tui.Theme{}.SelectionStyle()
+	base := tui.Dark.SelectionStyle()
 	var selected []string
 	for _, r := range rows {
 		if strings.HasPrefix(r, base) {
@@ -120,7 +172,7 @@ func TestExtPanelDialogWrapsStyledLinePreservingANSI(t *testing.T) {
 	d := newExtPanelDialog()
 	d.Open("demo", "main", "Demo", []string{styled}, "")
 
-	rows := d.Render(tui.Theme{}, width)
+	rows := d.Render(tui.Dark, width)
 	assertRowsFitWidth(t, rows, width)
 	for i, row := range rows[1 : len(rows)-1] {
 		if !strings.HasPrefix(row, "\x1b[31m") {

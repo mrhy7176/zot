@@ -108,6 +108,9 @@ type View struct {
 	// any, so tool_result rendering can pick the right syntax language.
 	// Rebuilt on each Build().
 	toolPaths map[string]string
+	// shellWorkingDirs retains call-time directories, never inferred on replay.
+	shellWorkingDirs map[string]string
+	shellCWD         string // scoped to the call currently being rendered
 	// toolStartLines maps tool_use_id to the 1-indexed first line
 	// number of a `read` result, pulled from the call's offset arg.
 	// Used by renderNumberedFile to draw a line-number gutter over
@@ -567,6 +570,8 @@ func (v *View) renderMessageCached(m provider.Message, width int, turnOpen bool)
 	for _, content := range m.Content {
 		if result, ok := content.(provider.ToolResultBlock); ok {
 			key.hash = fnv64aWrite(key.hash, []byte(v.toolSources[result.CallID]))
+			key.hash = fnv64aWriteByte(key.hash, 0)
+			key.hash = fnv64aWrite(key.hash, []byte(v.shellWorkingDirs[result.CallID]))
 		}
 	}
 	if v.renderCache != nil {
@@ -807,6 +812,7 @@ func (v *View) renderMessage(m provider.Message, width int, turnOpen bool) []str
 		nested := m.NestedToolCalls()
 		for _, c := range m.Content {
 			if tr, ok := c.(provider.ToolResultBlock); ok {
+				view := v.forShellCall(tr.CallID)
 				color := v.Theme.ToolOut
 				if tr.IsError {
 					color = v.Theme.Error
@@ -832,7 +838,7 @@ func (v *View) renderMessage(m provider.Message, width int, turnOpen bool) []str
 				// in one assistant message render as N adjacent boxes
 				// instead of stacking unclosed top edges.
 				if v.CollapseToolCall && !v.ExpandAll {
-					body := v.renderToolResultContent(tr.Content, width, color, path, startLine)
+					body := view.renderToolResultContent(tr.Content, width, color, path, startLine)
 					lines = append(lines, v.renderCollapsedTool(label, body, width, tr.IsError)...)
 					lines = append(lines, v.renderNestedToolCalls(nested[tr.CallID], width)...)
 					continue
@@ -845,7 +851,7 @@ func (v *View) renderMessage(m provider.Message, width int, turnOpen bool) []str
 					if tr.IsError {
 						lines = append(lines, toolBodyLine(v.Theme, v.Theme.FG256(color, "  error"), width, v.CompactMode))
 					}
-					for _, line := range v.renderToolResultWithSource(tr.Content, width, color, path, startLine, v.toolSources[tr.CallID]) {
+					for _, line := range view.renderToolResultWithSource(tr.Content, width, color, path, startLine, v.toolSources[tr.CallID]) {
 						_, stripped := parseImageFootprint(line)
 						lines = append(lines, toolBodyLine(v.Theme, stripped, width, v.CompactMode))
 					}
@@ -860,7 +866,7 @@ func (v *View) renderMessage(m provider.Message, width int, turnOpen bool) []str
 				if tr.IsError {
 					lines = append(lines, toolBoxSide(v.Theme, v.Theme.FG256(color, "  error"), width))
 				}
-				for _, line := range v.renderToolResultWithSource(tr.Content, width, color, path, startLine, v.toolSources[tr.CallID]) {
+				for _, line := range view.renderToolResultWithSource(tr.Content, width, color, path, startLine, v.toolSources[tr.CallID]) {
 					// Image-footprint rows (the escape row, the blank
 					// reservation rows beneath it, and the gap row
 					// before the metadata caption) are tagged with the
@@ -895,6 +901,7 @@ func (v *View) RenderToolCall(tc ToolCallView, width int) []string {
 }
 
 func (v *View) renderToolCall(tc ToolCallView, width int) []string {
+	v = v.forShellCall(tc.ID)
 	var lines []string
 
 	// Header label. While the call is still streaming, prefer the
@@ -1157,7 +1164,11 @@ func (v *View) renderLiveShellCommand(command string, width int, promptText stri
 		if wrapWidth < 10 {
 			wrapWidth = 10
 		}
-		for j, wrapped := range wrapANSILine(v.Theme.FG256(v.Theme.ToolOut, line), wrapWidth) {
+		styled := v.Theme.FG256(v.Theme.ToolOut, line)
+		if i == 0 && promptText == "$ " {
+			styled = v.styleShellCommand(line, v.Theme.ToolOut)
+		}
+		for j, wrapped := range wrapANSILine(styled, wrapWidth) {
 			prefix := firstPrefix
 			if j > 0 {
 				prefix = contPrefix
@@ -2121,11 +2132,18 @@ func (v *View) renderBashResult(lines []string, width, defaultColor int) []strin
 	for i, l := range lines {
 		switch {
 		case i == 0 && strings.HasPrefix(l, "$ "):
-			// Style the $ and the command text in accent. No
-			// further processing / wrapping so the shell-style
-			// prompt reads at a glance.
-			for _, w := range wrapLine(l, width-4, "    ") {
-				out = append(out, "    "+v.Theme.FG256(v.Theme.Accent, w))
+			command := strings.TrimPrefix(l, "$ ")
+			if redundantCDPrefix(command, v.shellCWD) == 0 {
+				for _, w := range wrapLine(l, width-4, "    ") {
+					out = append(out, "    "+v.Theme.FG256(v.Theme.Accent, w))
+				}
+				continue
+			}
+			// Keep the prompt in accent and mute a redundant cd prefix.
+			// Wrap after styling so foreground colors survive narrow rows.
+			styled := v.Theme.FG256(v.Theme.Accent, "$ ") + v.styleShellCommand(command, v.Theme.Accent)
+			for _, w := range wrapANSILine(styled, max(1, width-4)) {
+				out = append(out, "    "+w)
 			}
 		case i == footerIdx:
 			for _, w := range wrapLine(l, width-4, "    ") {
