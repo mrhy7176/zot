@@ -118,9 +118,13 @@ func renderExtPanelLine(th tui.Theme, raw string, width int) []string {
 		rows := tui.WrapANSILine(plain, width)
 		out := make([]string, 0, len(rows))
 		for _, row := range rows {
-			styled := th.FG256(th.Muted, row)
-			styled = strings.ReplaceAll(styled, "✓", th.FG256(th.Tool, "✓"))
-			out = append(out, styled)
+			// Style each text segment separately so a checkmark's reset
+			// cannot discard the body's foreground color.
+			parts := strings.Split(row, "✓")
+			for i := range parts {
+				parts[i] = th.FG256(th.FG, parts[i])
+			}
+			out = append(out, strings.Join(parts, th.FG256(th.Tool, "✓")))
 		}
 		return out
 	}
