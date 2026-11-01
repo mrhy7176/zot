@@ -114,17 +114,17 @@ var openRouterServerToolCases = []openRouterServerToolCase{
 	},
 	{
 		name:   "openrouter:advisor",
-		tool:   Tool{Name: "openrouter:advisor", Schema: json.RawMessage(`{"model":"openai/gpt-4.1-mini"}`)},
+		tool:   Tool{Name: "openrouter:advisor", Schema: json.RawMessage(`{"model":"~anthropic/claude-opus-latest"}`)},
 		prompt: "Ask the advisor whether 17 is prime. You MUST call the advisor tool, then answer in one word.",
 	},
 	{
 		name:   "openrouter:subagent",
-		tool:   Tool{Name: "openrouter:subagent", Schema: json.RawMessage(`{"model":"openai/gpt-4.1-mini"}`)},
+		tool:   Tool{Name: "openrouter:subagent", Schema: json.RawMessage(`{"model":"~deepseek/deepseek-flash-latest"}`)},
 		prompt: "Delegate to a subagent: return the sum of 21 and 21. You MUST call the subagent tool.",
 	},
 	{
 		name:   "openrouter:fusion",
-		tool:   Tool{Name: "openrouter:fusion", Schema: json.RawMessage(`{"analysis_models":["openai/gpt-4.1-mini"],"model":"openai/gpt-4.1-mini"}`)},
+		tool:   Tool{Name: "openrouter:fusion", Schema: json.RawMessage(`{"analysis_models":["~anthropic/claude-haiku-latest","~deepseek/deepseek-flash-latest","~openai/gpt-luna-latest"],"model":"~anthropic/claude-haiku-latest"}`)},
 		prompt: "Use fusion to answer in one sentence: what is 1+1? You MUST call the fusion tool.",
 	},
 	{
