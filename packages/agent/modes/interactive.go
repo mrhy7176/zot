@@ -3464,6 +3464,7 @@ func (i *Interactive) applyChangedCWD(ag *core.Agent, provider, model, cwd strin
 	i.mu.Lock()
 	i.agent = ag
 	i.cfg.CWD = cwd
+	i.view.ForgetShellCWD()
 	i.cfg.StartupContextPaths = append([]string(nil), startupContextPaths...)
 	i.view.StartupContextPaths = nil
 	if i.cfg.ShowInstructionsAtStartup != nil && *i.cfg.ShowInstructionsAtStartup {
@@ -4934,6 +4935,7 @@ func (i *Interactive) runSlash(ctx context.Context, cmd string) (done bool) {
 		i.inputHistoryIndex = -1
 		i.pendingFork = false
 		i.view.Messages = nil
+		i.view.ForgetShellCWD()
 		i.view.TailLimit = 0
 		i.view.InvalidateRenderCache()
 		i.mu.Unlock()
@@ -4946,6 +4948,7 @@ func (i *Interactive) runSlash(ctx context.Context, cmd string) (done bool) {
 			i.agent.SetMessages(nil)
 		}
 		i.mu.Lock()
+		i.view.ForgetShellCWD()
 		i.toolCalls = map[string]*tui.ToolCallView{}
 		i.toolOrder = nil
 		i.toolGate = map[string]int{}
@@ -5109,6 +5112,7 @@ func (i *Interactive) runSlash(ctx context.Context, cmd string) (done bool) {
 		// agent + session. Reset transient TUI state so the new
 		// session opens clean.
 		i.mu.Lock()
+		i.view.ForgetShellCWD()
 		i.toolCalls = map[string]*tui.ToolCallView{}
 		i.toolOrder = nil
 		i.toolGate = map[string]int{}
@@ -5778,6 +5782,7 @@ func (i *Interactive) applySessionSelection(path string) {
 		}
 		i.compactionsSinceInput = 0
 		i.awaitingInitialUserMessage = false
+		i.view.ForgetShellCWD()
 		i.statusOK = "resumed session: " + path
 		i.statusErr = ""
 		i.parkedTurn = 0
@@ -6790,6 +6795,7 @@ func (i *Interactive) handleEvent(ev core.AgentEvent) {
 		}
 		i.resetStreamingStateLocked()
 	case core.EvToolUseStart:
+		i.view.RememberShellCWD(e.ID, e.Name, i.cfg.CWD)
 		// Live streaming: pre-create the view so the user sees the
 		// tool call being composed in real time. Any subsequent
 		// EvToolCall for the same ID updates the same struct (the
@@ -6820,6 +6826,7 @@ func (i *Interactive) handleEvent(ev core.AgentEvent) {
 			tc.Streaming = false
 		}
 	case core.EvToolCall:
+		i.view.RememberShellCWD(e.ID, e.Name, i.cfg.CWD)
 		// If we already pre-created the view during streaming, just
 		// refresh the final Args summary. Otherwise create a new one
 		// (non-streaming providers or legacy paths).
@@ -7659,6 +7666,7 @@ func (i *Interactive) doSessionImport(src string) {
 	i.mu.Lock()
 	i.compactionsSinceInput = 0
 	i.awaitingInitialUserMessage = false
+	i.view.ForgetShellCWD()
 	i.statusOK = "imported and switched to session " + friendlyPath(newPath)
 	i.statusErr = ""
 	i.mu.Unlock()
@@ -7835,6 +7843,7 @@ func (i *Interactive) applySessionTreeMessageSelection(src string, msgIdx, turnN
 	i.mu.Lock()
 	i.compactionsSinceInput = 0
 	i.awaitingInitialUserMessage = false
+	i.view.ForgetShellCWD()
 	if role == provider.RoleUser {
 		i.ed.SetValue(prompt)
 		i.statusOK = fmt.Sprintf("checked out before turn %d; edit and send to branch", turnNo)
@@ -7899,6 +7908,7 @@ func (i *Interactive) applyForkSelection(msgIdx int) {
 	i.mu.Lock()
 	i.compactionsSinceInput = 0
 	i.awaitingInitialUserMessage = false
+	i.view.ForgetShellCWD()
 	i.statusOK = "forked and switched to new branch at " + friendlyPath(newPath)
 	i.statusErr = ""
 	i.mu.Unlock()

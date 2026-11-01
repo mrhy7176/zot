@@ -337,6 +337,7 @@ func (d *btwDialog) handleAgentEvent(turnIdx int, ev core.AgentEvent) {
 	case core.EvTextDelta:
 		turn.Assistant += e.Delta
 	case core.EvToolUseStart:
+		d.toolView.RememberShellCWD(e.ID, e.Name, d.cwd)
 		turn.Tools = append(turn.Tools, tui.ToolCallView{ID: e.ID, Name: e.Name, Streaming: true})
 	case core.EvToolUseArgs:
 		if tool := findBtwTool(turn, e.ID); tool != nil {
@@ -352,6 +353,7 @@ func (d *btwDialog) handleAgentEvent(turnIdx int, ev core.AgentEvent) {
 			tool.Streaming = false
 		}
 	case core.EvToolCall:
+		d.toolView.RememberShellCWD(e.ID, e.Name, d.cwd)
 		tool := findBtwTool(turn, e.ID)
 		if tool == nil {
 			turn.Tools = append(turn.Tools, tui.ToolCallView{ID: e.ID, Name: e.Name})
